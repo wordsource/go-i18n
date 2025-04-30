@@ -1,5 +1,7 @@
 package i18n
 
+import "gopkg.in/yaml.v3"
+
 type Config struct {
 	BundleDirectory string `yaml:"bundle_dir"`
 }
