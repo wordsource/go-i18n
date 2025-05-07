@@ -85,7 +85,7 @@ func LoadBundles(fs embed.FS) error {
 			return err
 		}
 
-		GetLocalizer().Register(tag, bundle)
+		GetLocalizer().RegisterBundle(tag, bundle)
 	}
 
 	return nil

@@ -7,12 +7,42 @@ import (
 	"golang.org/x/text/language"
 )
 
-var DefaultLocale = language.AmericanEnglish
+// Data is a map of values to be used in message formatting. The key is the name of the value
+// to be replaced in the message. Suitable values are strings, numbers, and other primitive types.
+type Data map[string]interface{}
 
 // Localize localizes the given message using the locale in context. It returns the given message
 // if the locale is not found or a translated version of the message is not found in that locale.
 func Localize(ctx context.Context, message string) string {
-	bundle := GetLocalizer().GetBundle(GetLocale(ctx))
+	return LocalizeTo(GetLocale(ctx), message)
+}
+
+// LocalizeD is like Localize but allows the developer to pass a description of the message
+// to be used during translation, like additional context to a human translator (or LLM prompt)
+//
+// The description is extracted along with the message, and both are hashed together to create
+// the message identifier. Both are stored in the defaultMessage.json file.
+func LocalizeD(ctx context.Context, message string, description string) string {
+	return LocalizeToD(GetLocale(ctx), message, description)
+}
+
+// Localizef localizes the given message using the locale in context, then formats the message
+// by applying the given Data.
+func Localizef(ctx context.Context, message string, data Data) string {
+	return LocalizeTof(GetLocale(ctx), message, data)
+}
+
+// LocalizeDf is like Localizef but allows the developer to pass a description of the message
+// to be used during translation, like additional context to a human translator (or LLM prompt)
+//
+// The description is extracted along with the message, and both are hashed together to create
+// the message identifier. Both are stored in the defaultMessage.json file.
+func LocalizeDf(ctx context.Context, message string, description string, values Data) string {
+	return LocalizeToDf(GetLocale(ctx), message, description, values)
+}
+
+func LocalizeTo(tag language.Tag, message string) string {
+	bundle := GetLocalizer().GetBundle(tag)
 	if bundle == nil {
 		return message
 	}
@@ -26,13 +56,8 @@ func Localize(ctx context.Context, message string) string {
 	return localizedMessage.Message
 }
 
-// LocalizeD is like Localize but allows the developer to pass a description of the message
-// to be used during translation, like additional context to a human translator (or LLM prompt)
-//
-// The description is extracted along with the message, and both are hashed together to create
-// the message identifier. Both are stored in the defaultMessage.json file.
-func LocalizeD(ctx context.Context, message string, description string) string {
-	bundle := GetLocalizer().GetBundle(GetLocale(ctx))
+func LocalizeToD(tag language.Tag, message string, description string) string {
+	bundle := GetLocalizer().GetBundle(tag)
 	if bundle == nil {
 		return message
 	}
@@ -46,14 +71,9 @@ func LocalizeD(ctx context.Context, message string, description string) string {
 	return localizedMessage.Message
 }
 
-// Values is a map of values to be used in message formatting. The key is the name of the value
-// to be replaced in the message. Suitable values are strings, numbers, and other primitive types.
-type Values map[string]interface{}
+func LocalizeTof(tag language.Tag, message string, data Data) string {
+	localizedMessage := LocalizeTo(tag, message)
 
-// Localizef localizes the given message using the locale in context, then formats the message
-// by applying the given Values.
-func Localizef(ctx context.Context, message string, values Values) string {
-	localizedMessage := Localize(ctx, message)
 	pt, err := messageformat.NewParser().Parse(localizedMessage)
 	if err != nil {
 		return localizedMessage
@@ -64,7 +84,7 @@ func Localizef(ctx context.Context, message string, values Values) string {
 		return localizedMessage
 	}
 
-	formattedMessage, err := f.FormatMap(pt, values)
+	formattedMessage, err := f.FormatMap(pt, data)
 	if err != nil {
 		return localizedMessage
 	}
@@ -72,11 +92,23 @@ func Localizef(ctx context.Context, message string, values Values) string {
 	return formattedMessage
 }
 
-// LocalizeDf is like Localizef but allows the developer to pass a description of the message
-// to be used during translation, like additional context to a human translator (or LLM prompt)
-//
-// The description is extracted along with the message, and both are hashed together to create
-// the message identifier. Both are stored in the defaultMessage.json file.
-func LocalizeDf(ctx context.Context, message string, description string, values Values) string {
-	return Localizef(ctx, message, values)
+func LocalizeToDf(tag language.Tag, message string, description string, data Data) string {
+	localizedMessage := LocalizeToD(tag, message, description)
+
+	pt, err := messageformat.NewParser().Parse(localizedMessage)
+	if err != nil {
+		return localizedMessage
+	}
+
+	f, err := messageformat.NewFormatter()
+	if err != nil {
+		return localizedMessage
+	}
+
+	formattedMessage, err := f.FormatMap(pt, data)
+	if err != nil {
+		return localizedMessage
+	}
+
+	return formattedMessage
 }

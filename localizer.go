@@ -4,7 +4,9 @@ import "golang.org/x/text/language"
 
 type Localizer interface {
 	GetBundle(language.Tag) LanguageBundle
-	Register(language.Tag, LanguageBundle)
+	RegisterBundle(language.Tag, LanguageBundle)
+	SupportsLocale(language.Tag) bool
+	ParseAcceptLanguage(string) ([]language.Tag, []float32, error)
 }
 
 type localizerImpl struct {
@@ -12,7 +14,8 @@ type localizerImpl struct {
 }
 
 var (
-	instance Localizer
+	instance      Localizer
+	DefaultLocale = language.AmericanEnglish
 )
 
 func GetLocalizer() Localizer {
@@ -28,7 +31,7 @@ func (l *localizerImpl) GetBundle(locale language.Tag) LanguageBundle {
 	return l.bundles[locale]
 }
 
-func (l *localizerImpl) Register(locale language.Tag, bundle LanguageBundle) {
+func (l *localizerImpl) RegisterBundle(locale language.Tag, bundle LanguageBundle) {
 	if l.bundles == nil {
 		l.bundles = make(map[language.Tag]LanguageBundle)
 	}
@@ -37,4 +40,33 @@ func (l *localizerImpl) Register(locale language.Tag, bundle LanguageBundle) {
 	} else {
 		l.bundles[locale] = bundle
 	}
+}
+
+func (l *localizerImpl) SupportsLocale(locale language.Tag) bool {
+	if locale == DefaultLocale {
+		return true
+	}
+	if l.bundles == nil {
+		return false
+	}
+	_, ok := l.bundles[locale]
+	return ok
+}
+
+func (l *localizerImpl) ParseAcceptLanguage(accept string) ([]language.Tag, []float32, error) {
+	acceptLocales, acceptWeights, err := language.ParseAcceptLanguage(accept)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	supportedLocales := make([]language.Tag, 0)
+	supportedWeights := make([]float32, 0)
+	for idx, tag := range acceptLocales {
+		if l.SupportsLocale(tag) {
+			supportedLocales = append(supportedLocales, tag)
+			supportedWeights = append(supportedWeights, acceptWeights[idx])
+		}
+	}
+
+	return supportedLocales, supportedWeights, nil
 }
